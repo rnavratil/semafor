@@ -1,79 +1,85 @@
 #!/bin/bash
-# semafor - update Semafor app state
-# Usage:
-#   semafor green              # clear all items
-#   semafor red "item text"    # set red, add item
-#   semafor add "item text"    # add item, set red
-#   semafor clear              # same as green
-#   semafor status             # show current state
+
+# Semafor CLI - Control your menu bar status indicator
 
 STATE_DIR="$HOME/.semafor"
 STATE_FILE="$STATE_DIR/state.json"
 
+# Create directory if it doesn't exist
 mkdir -p "$STATE_DIR"
 
-COMMAND="${1:-}"
-ITEM="${2:-}"
-NOW=$(date "+%H:%M")
+# Initialize default state if file doesn't exist
+if [ ! -f "$STATE_FILE" ]; then
+    echo '{"color":"green","items":[],"updated":""}' > "$STATE_FILE"
+fi
 
-_update() {
-  local color="$1"
-  local items_json="$2"
-  printf '{"color":"%s","items":%s,"updated":"%s"}\n' "$color" "$items_json" "$NOW" > "$STATE_FILE"
-}
-
-_read_items() {
-  if [ -f "$STATE_FILE" ]; then
-    python3 -c "import json; d=json.load(open('$STATE_FILE')); print(json.dumps(d.get('items',[])))"
-  else
-    echo "[]"
-  fi
-}
-
-_add_item() {
-  local item="$1"
-  python3 -c "
-import json, sys
-items = json.loads(sys.argv[1])
-item = sys.argv[2]
-if item not in items:
-    items.append(item)
-print(json.dumps(items))
-" "$(_read_items)" "$item"
-}
-
-case "$COMMAND" in
-  green|clear)
-    _update "green" "[]"
-    echo "✅ Semafor: green"
-    ;;
-  red)
-    if [ -n "$ITEM" ]; then
-      ITEMS=$(_add_item "$ITEM")
-      _update "red" "$ITEMS"
-      echo "🔴 Semafor: red — $ITEM"
-    else
-      _update "red" "[]"
-      echo "🔴 Semafor: red"
-    fi
-    ;;
-  add)
-    if [ -z "$ITEM" ]; then
-      echo "Usage: semafor add \"item text\"" >&2; exit 1
-    fi
-    ITEMS=$(_add_item "$ITEM")
-    _update "red" "$ITEMS"
-    echo "🔴 Semafor: added — $ITEM"
-    ;;
-  status)
-    [ -f "$STATE_FILE" ] && python3 -m json.tool "$STATE_FILE" || echo "No state yet."
-    ;;
-  *)
-    echo "Usage:"
-    echo "  semafor green              # clear, set green"
-    echo "  semafor red [\"item\"]       # set red, optionally add item"
-    echo "  semafor add \"item\"         # add item, set red"
-    echo "  semafor clear              # same as green"
-    echo "  semafor status             # show current state"
-    ;;
+case "$1" in
+    red)
+        if [ -z "$2" ]; then
+            echo "Usage: semafor red \"reason\" [url]"
+            exit 1
+        fi
+        # Set red and replace items with new reason (with optional URL)
+        if [ -n "$3" ]; then
+            jq --arg text "$2" --arg url "$3" --arg time "$(date '+%Y-%m-%d %H:%M:%S')" \
+               '.color = "red" | .items = [{"text": $text, "url": $url}] | .updated = $time' \
+               "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
+            echo "🔴 Status set to red: $2 ($3)"
+        else
+            jq --arg text "$2" --arg time "$(date '+%Y-%m-%d %H:%M:%S')" \
+               '.color = "red" | .items = [{"text": $text}] | .updated = $time' \
+               "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
+            echo "🔴 Status set to red: $2"
+        fi
+        ;;
+    
+    add)
+        if [ -z "$2" ]; then
+            echo "Usage: semafor add \"reason\" [url]"
+            exit 1
+        fi
+        # Add item without clearing existing ones, set to red (with optional URL)
+        if [ -n "$3" ]; then
+            jq --arg text "$2" --arg url "$3" --arg time "$(date '+%Y-%m-%d %H:%M:%S')" \
+               '.color = "red" | .items += [{"text": $text, "url": $url}] | .updated = $time' \
+               "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
+            echo "➕ Added: $2 ($3)"
+        else
+            jq --arg text "$2" --arg time "$(date '+%Y-%m-%d %H:%M:%S')" \
+               '.color = "red" | .items += [{"text": $text}] | .updated = $time' \
+               "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
+            echo "➕ Added: $2"
+        fi
+        ;;
+    
+    green)
+        # Clear all items and set to green
+        jq --arg time "$(date '+%Y-%m-%d %H:%M:%S')" \
+           '.color = "green" | .items = [] | .updated = $time' \
+           "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
+        echo "🟢 Status set to green (all clear)"
+        ;;
+    
+    status)
+        # Print current state
+        if [ -f "$STATE_FILE" ]; then
+            echo "Current state:"
+            cat "$STATE_FILE" | jq .
+        else
+            echo "No state file found"
+        fi
+        ;;
+    
+    *)
+        echo "Semafor CLI - Menu bar status indicator"
+        echo ""
+        echo "Usage:"
+        echo "  semafor red \"reason\" [url]    Set red and add an item (with optional link)"
+        echo "  semafor add \"reason\" [url]    Add another item without clearing (with optional link)"
+        echo "  semafor green            Clear all items and set to green"
+        echo "  semafor status           Show current state"
+        echo ""
+        echo "State file: $STATE_FILE"
+        exit 1
+        ;;
 esac
