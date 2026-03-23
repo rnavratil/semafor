@@ -1,14 +1,21 @@
 import Foundation
 import AppKit
+import Combine
 
-class CLIInstaller {
+class CLIInstaller: ObservableObject {
     static let shared = CLIInstaller()
     
     private let installPath = "/usr/local/bin/semafor"
     private let cliScriptName = "semafor"
     
-    var isInstalled: Bool {
-        FileManager.default.fileExists(atPath: installPath)
+    @Published var isInstalled: Bool = false
+    
+    private init() {
+        refreshInstallationStatus()
+    }
+    
+    func refreshInstallationStatus() {
+        isInstalled = FileManager.default.fileExists(atPath: installPath)
     }
     
     func checkAndPromptInstallation() {
@@ -68,24 +75,29 @@ class CLIInstaller {
         do shell script "mkdir -p /usr/local/bin && cp '\(cliSource)' '\(installPath)' && chmod +x '\(installPath)'" with administrator privileges
         """
         
+        // Create NSAppleScript on main thread to avoid FSFindFolder errors
+        guard let scriptObject = NSAppleScript(source: script) else {
+            showError("Failed to create install script")
+            return
+        }
+        
         DispatchQueue.global(qos: .userInitiated).async {
             var error: NSDictionary?
-            if let scriptObject = NSAppleScript(source: script) {
-                scriptObject.executeAndReturnError(&error)
-                
-                DispatchQueue.main.async {
-                    if let error = error {
-                        // Check if user cancelled (error -128)
-                        if let errorNumber = error[NSAppleScript.errorNumber] as? Int {
-                            if errorNumber == -128 {
-                                // User cancelled, do nothing
-                                return
-                            }
+            scriptObject.executeAndReturnError(&error)
+            
+            DispatchQueue.main.async {
+                if let error = error {
+                    // Check if user cancelled (error -128)
+                    if let errorNumber = error[NSAppleScript.errorNumber] as? Int {
+                        if errorNumber == -128 {
+                            // User cancelled, do nothing
+                            return
                         }
-                        self.showError("Installation failed: \(error)")
-                    } else {
-                        self.showSuccess()
                     }
+                    self.showError("Installation failed: \(error)")
+                } else {
+                    self.refreshInstallationStatus()
+                    self.showSuccess()
                 }
             }
         }
@@ -153,29 +165,34 @@ class CLIInstaller {
         do shell script "rm -f '\(installPath)'" with administrator privileges
         """
         
+        // Create NSAppleScript on main thread to avoid FSFindFolder errors
+        guard let scriptObject = NSAppleScript(source: script) else {
+            showError("Failed to create uninstall script")
+            return
+        }
+        
         DispatchQueue.global(qos: .userInitiated).async {
             var error: NSDictionary?
-            if let scriptObject = NSAppleScript(source: script) {
-                scriptObject.executeAndReturnError(&error)
-                
-                DispatchQueue.main.async {
-                    if let error = error {
-                        // Check if user cancelled (error -128)
-                        if let errorNumber = error[NSAppleScript.errorNumber] as? Int {
-                            if errorNumber == -128 {
-                                // User cancelled, do nothing
-                                return
-                            }
+            scriptObject.executeAndReturnError(&error)
+            
+            DispatchQueue.main.async {
+                if let error = error {
+                    // Check if user cancelled (error -128)
+                    if let errorNumber = error[NSAppleScript.errorNumber] as? Int {
+                        if errorNumber == -128 {
+                            // User cancelled, do nothing
+                            return
                         }
-                        self.showError("Uninstallation failed: \(error)")
-                    } else {
-                        let alert = NSAlert()
-                        alert.messageText = "Uninstalled"
-                        alert.informativeText = "The 'semafor' CLI tool has been removed."
-                        alert.alertStyle = .informational
-                        alert.addButton(withTitle: "OK")
-                        alert.runModal()
                     }
+                    self.showError("Uninstallation failed: \(error)")
+                } else {
+                    self.refreshInstallationStatus()
+                    let alert = NSAlert()
+                    alert.messageText = "Uninstalled"
+                    alert.informativeText = "The 'semafor' CLI tool has been removed."
+                    alert.alertStyle = .informational
+                    alert.addButton(withTitle: "OK")
+                    alert.runModal()
                 }
             }
         }

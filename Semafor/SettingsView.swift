@@ -24,22 +24,22 @@ struct SettingsView: View {
 
 struct HelpTab: View {
     @State private var showCopiedConfirmation = false
-    @State private var cliInstalled = CLIInstaller.shared.isInstalled
+    @ObservedObject private var cliInstaller = CLIInstaller.shared
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             // CLI Installation status
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
-                    Image(systemName: cliInstalled ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                        .foregroundColor(cliInstalled ? .green : .orange)
+                    Image(systemName: cliInstaller.isInstalled ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                        .foregroundColor(cliInstaller.isInstalled ? .green : .orange)
                     
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(cliInstalled ? "CLI tool is installed" : "CLI tool is not installed")
+                        Text(cliInstaller.isInstalled ? "CLI tool is installed" : "CLI tool is not installed")
                             .font(.subheadline)
                             .fontWeight(.medium)
                         
-                        if cliInstalled {
+                        if cliInstaller.isInstalled {
                             Text("Installed at: /usr/local/bin/semafor")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -54,31 +54,21 @@ struct HelpTab: View {
                 }
                 
                 HStack(spacing: 8) {
-                    if !cliInstalled {
+                    if !cliInstaller.isInstalled {
                         Button("Install CLI Tool") {
                             CLIInstaller.shared.installCLI()
-                            // Refresh status after a moment
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                                cliInstalled = CLIInstaller.shared.isInstalled
-                            }
                         }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.small)
                     } else {
                         Button("Reinstall") {
                             CLIInstaller.shared.installCLI()
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                                cliInstalled = CLIInstaller.shared.isInstalled
-                            }
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                         
                         Button("Uninstall") {
                             CLIInstaller.shared.uninstall()
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                                cliInstalled = CLIInstaller.shared.isInstalled
-                            }
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
@@ -140,9 +130,6 @@ struct HelpTab: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(.top, 24)
         .padding(.bottom, 16)
-        .onAppear {
-            cliInstalled = CLIInstaller.shared.isInstalled
-        }
     }
     
     private func copyAllCommands() {
