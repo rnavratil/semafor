@@ -2,8 +2,6 @@
 
 A macOS menu bar status indicator with CLI support. Perfect for showing your availability, deployment status, or any binary state.
 
-![Semafor Icon](Assets.xcassets/AppIcon.appiconset/vertical_traffic_light.png)
-
 ## Features
 
 - 🟢 **Menu Bar Indicator** - Shows green (available) or red (busy) status
