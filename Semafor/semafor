@@ -1,0 +1,85 @@
+#!/bin/bash
+
+# Semafor CLI - Control your menu bar status indicator
+
+STATE_DIR="$HOME/.semafor"
+STATE_FILE="$STATE_DIR/state.json"
+
+# Create directory if it doesn't exist
+mkdir -p "$STATE_DIR"
+
+# Initialize default state if file doesn't exist
+if [ ! -f "$STATE_FILE" ]; then
+    echo '{"color":"green","items":[],"updated":""}' > "$STATE_FILE"
+fi
+
+case "$1" in
+    red)
+        if [ -z "$2" ]; then
+            echo "Usage: semafor red \"reason\" [url]"
+            exit 1
+        fi
+        # Set red and replace items with new reason (with optional URL)
+        if [ -n "$3" ]; then
+            jq --arg text "$2" --arg url "$3" --arg time "$(date '+%Y-%m-%d %H:%M:%S')" \
+               '.color = "red" | .items = [{"text": $text, "url": $url}] | .updated = $time' \
+               "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
+            echo "🔴 Status set to red: $2 ($3)"
+        else
+            jq --arg text "$2" --arg time "$(date '+%Y-%m-%d %H:%M:%S')" \
+               '.color = "red" | .items = [{"text": $text}] | .updated = $time' \
+               "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
+            echo "🔴 Status set to red: $2"
+        fi
+        ;;
+    
+    add)
+        if [ -z "$2" ]; then
+            echo "Usage: semafor add \"reason\" [url]"
+            exit 1
+        fi
+        # Add item without clearing existing ones, set to red (with optional URL)
+        if [ -n "$3" ]; then
+            jq --arg text "$2" --arg url "$3" --arg time "$(date '+%Y-%m-%d %H:%M:%S')" \
+               '.color = "red" | .items += [{"text": $text, "url": $url}] | .updated = $time' \
+               "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
+            echo "➕ Added: $2 ($3)"
+        else
+            jq --arg text "$2" --arg time "$(date '+%Y-%m-%d %H:%M:%S')" \
+               '.color = "red" | .items += [{"text": $text}] | .updated = $time' \
+               "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
+            echo "➕ Added: $2"
+        fi
+        ;;
+    
+    green)
+        # Clear all items and set to green
+        jq --arg time "$(date '+%Y-%m-%d %H:%M:%S')" \
+           '.color = "green" | .items = [] | .updated = $time' \
+           "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
+        echo "🟢 Status set to green (all clear)"
+        ;;
+    
+    status)
+        # Print current state
+        if [ -f "$STATE_FILE" ]; then
+            echo "Current state:"
+            cat "$STATE_FILE" | jq .
+        else
+            echo "No state file found"
+        fi
+        ;;
+    
+    *)
+        echo "Semafor CLI - Menu bar status indicator"
+        echo ""
+        echo "Usage:"
+        echo "  semafor red \"reason\" [url]    Set red and add an item (with optional link)"
+        echo "  semafor add \"reason\" [url]    Add another item without clearing (with optional link)"
+        echo "  semafor green            Clear all items and set to green"
+        echo "  semafor status           Show current state"
+        echo ""
+        echo "State file: $STATE_FILE"
+        exit 1
+        ;;
+esac

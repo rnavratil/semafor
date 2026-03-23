@@ -1,0 +1,79 @@
+#!/bin/bash
+# semafor - update Semafor app state
+# Usage:
+#   semafor green              # clear all items
+#   semafor red "item text"    # set red, add item
+#   semafor add "item text"    # add item, set red
+#   semafor clear              # same as green
+#   semafor status             # show current state
+
+STATE_DIR="$HOME/.semafor"
+STATE_FILE="$STATE_DIR/state.json"
+
+mkdir -p "$STATE_DIR"
+
+COMMAND="${1:-}"
+ITEM="${2:-}"
+NOW=$(date "+%H:%M")
+
+_update() {
+  local color="$1"
+  local items_json="$2"
+  printf '{"color":"%s","items":%s,"updated":"%s"}\n' "$color" "$items_json" "$NOW" > "$STATE_FILE"
+}
+
+_read_items() {
+  if [ -f "$STATE_FILE" ]; then
+    python3 -c "import json; d=json.load(open('$STATE_FILE')); print(json.dumps(d.get('items',[])))"
+  else
+    echo "[]"
+  fi
+}
+
+_add_item() {
+  local item="$1"
+  python3 -c "
+import json, sys
+items = json.loads(sys.argv[1])
+item = sys.argv[2]
+if item not in items:
+    items.append(item)
+print(json.dumps(items))
+" "$(_read_items)" "$item"
+}
+
+case "$COMMAND" in
+  green|clear)
+    _update "green" "[]"
+    echo "✅ Semafor: green"
+    ;;
+  red)
+    if [ -n "$ITEM" ]; then
+      ITEMS=$(_add_item "$ITEM")
+      _update "red" "$ITEMS"
+      echo "🔴 Semafor: red — $ITEM"
+    else
+      _update "red" "[]"
+      echo "🔴 Semafor: red"
+    fi
+    ;;
+  add)
+    if [ -z "$ITEM" ]; then
+      echo "Usage: semafor add \"item text\"" >&2; exit 1
+    fi
+    ITEMS=$(_add_item "$ITEM")
+    _update "red" "$ITEMS"
+    echo "🔴 Semafor: added — $ITEM"
+    ;;
+  status)
+    [ -f "$STATE_FILE" ] && python3 -m json.tool "$STATE_FILE" || echo "No state yet."
+    ;;
+  *)
+    echo "Usage:"
+    echo "  semafor green              # clear, set green"
+    echo "  semafor red [\"item\"]       # set red, optionally add item"
+    echo "  semafor add \"item\"         # add item, set red"
+    echo "  semafor clear              # same as green"
+    echo "  semafor status             # show current state"
+    ;;
+esac

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Workspace
+   version = "1.0">
+   <FileRef
+      location = "self:">
+   </FileRef>
+   <FileRef
+      location = "group:semafor">
+   </FileRef>
+   <FileRef
+      location = "group:test_cli.sh">
+   </FileRef>
+   <FileRef
+      location = "group:Caskssemafor.rb">
+   </FileRef>
+   <FileRef
+      location = "group:homebrew-tap-README.md">
+   </FileRef>
+</Workspace>
