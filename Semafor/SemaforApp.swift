@@ -25,7 +25,7 @@ struct SemaforApp: App {
         } label: {
             Text(state.color == "red" ? redEmoji : greenEmoji)
         }
-        .menuBarExtraStyle(.menu)
+        .menuBarExtraStyle(.window)
 
         Window("Settings", id: "settings") {
             SettingsView()

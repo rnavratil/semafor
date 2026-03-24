@@ -101,6 +101,20 @@ class SemaforState: ObservableObject {
         fileWatcher = source
     }
 
+    func deleteItem(_ item: SemaforItem) {
+        let newItems = items.filter { $0.id != item.id }
+        let newColor = newItems.isEmpty ? "green" : color
+
+        // Update in-memory state immediately to avoid flicker
+        self.items = newItems
+        self.color = newColor
+
+        // Write back to file
+        let newData = SemaforData(color: newColor, items: newItems, updated: updated)
+        guard let data = try? JSONEncoder().encode(newData) else { return }
+        try? data.write(to: stateURL, options: .atomic)
+    }
+
     deinit {
         fileWatcher?.cancel()
     }
