@@ -274,7 +274,7 @@ struct AboutTab: View {
                 VStack(alignment: .leading) {
                     Text("Semafor")
                         .font(.title2.bold())
-                    Text("Version 1.0")
+                    Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")")
                         .foregroundColor(.secondary)
                 }
             }
